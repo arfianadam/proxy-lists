@@ -1,6 +1,6 @@
 {
   "name": "proxy-lists",
-  "version": "1.11.0",
+  "version": "1.16.0",
   "description": "Get proxies from publicly available proxy lists.",
   "keywords": [
     "proxies",
@@ -10,7 +10,10 @@
   ],
   "main": "index.js",
   "scripts": {
-    "test": "grunt test"
+    "lint": "eslint --config .eslintrc.js *.js sources/*.js test/**/*.js",
+    "prepublish": "npm run test # runs before `npm publish`",
+    "pretest": "npm run lint # runs before `npm test`",
+    "test": "mocha test/unit/ --recursive --reporter spec --ui bdd"
   },
   "bin": {
     "proxy-lists": "cli.js"
@@ -29,23 +32,16 @@
     "url": "https://github.com/chill117/proxy-lists/issues"
   },
   "dependencies": {
-    "async": "2.1.2",
-    "cheerio": "0.22.0",
-    "commander": "2.9.0",
-    "css": "2.2.1",
-    "geoip-native-lite": "0.2.0",
-    "request": "2.78.0",
-    "underscore": "1.8.3",
-    "xml2js": "0.4.17"
+    "async": "2.6.1",
+    "cheerio": "1.0.0-rc.2",
+    "commander": "2.19.0",
+    "data-sourcer": "1.6.0",
+    "geoip-native-lite": "0.3.0",
+    "request": "2.88.0",
+    "underscore": "1.9.1",
+    "xml2js": "0.4.19"
   },
   "devDependencies": {
-    "benchmark": "2.1.2",
-    "chai": "3.5.0",
-    "grunt": "1.0.1",
-    "grunt-eslint": "19.0.0",
-    "grunt-mocha-test": "0.13.2",
-    "load-grunt-config": "0.19.2",
-    "mocha": "3.1.2",
-    "time-grunt": "1.4.0"
+    "chai": "4.2.0"
   }
 }

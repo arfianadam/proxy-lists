@@ -7,9 +7,7 @@ var ProxyLists = require('../../../index');
 
 describe('source.getProxies([options, ]cb)', function() {
 
-	_.each(_.keys(ProxyLists._sources), function(name) {
-
-		var source = ProxyLists._sources[name];
+	_.each(ProxyLists.sourcer.sources, function(source, name) {
 
 		describe('source.' + name, function() {
 
@@ -80,49 +78,43 @@ describe('source.getProxies([options, ]cb)', function() {
 					sample: true
 				});
 
-				options = ProxyLists.prepareOptions(options);
+				ProxyLists.getProxiesFromSource(name, options)
+					.on('data', function(proxies) {
 
-				var gettingProxies = source.getProxies(options);
+						gotProxies = true;
 
-				gettingProxies.on('data', function(proxies) {
+						var invalidProxies = [];
 
-					gotProxies = true;
+						try {
 
-					var invalidProxies = [];
+							expect(proxies).to.be.an('array');
 
-					try {
-
-						expect(proxies).to.be.an('array');
-
-						if (!(proxies.length > 0)) {
-							throw new Error('Expected at least one proxy.');
-						}
-
-						_.each(proxies, function(proxy) {
-
-							try {
-								expect(isValidProxy(proxy)).to.equal(true);
-							} catch (error) {
-								invalidProxies.push(proxy);
+							if (!(proxies.length > 0)) {
+								throw new Error('Expected at least one proxy.');
 							}
-						});
+							_.each(proxies, function(proxy) {
+								try {
+									expect(isValidProxy(proxy)).to.equal(true);
+								} catch (error) {
+									invalidProxies.push(proxy);
+								}
+							});
 
-						var percentInvalid = (invalidProxies.length / proxies.length) * 100;
+							var percentInvalid = (invalidProxies.length / proxies.length) * 100;
 
-						// Allow up to 40% of the proxies to be invalid.
-						if (percentInvalid > 40) {
-							// Print up to 10 invalid proxies for debugging.
-							console.log(invalidProxies.slice(0, Math.min(10, invalidProxies.length)));
-							throw new Error('Too many invalid proxies from source: "' + name + '"');
+							// Allow up to 40% of the proxies to be invalid.
+							if (percentInvalid > 40) {
+								// Print up to 10 invalid proxies for debugging.
+								console.log(invalidProxies.slice(0, Math.min(10, invalidProxies.length)));
+								throw new Error('Too many invalid proxies from source: "' + name + '"');
+							}
+
+						} catch (error) {
+							return cb(error);
 						}
-
-					} catch (error) {
-						return cb(error);
-					}
-				});
-
-				gettingProxies.on('error', cb);
-				gettingProxies.on('end', cb);
+					})
+					.on('error', cb)
+					.once('end', cb);
 			});
 		});
 	});

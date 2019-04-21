@@ -2,30 +2,33 @@
 
 var _ = require('underscore');
 
+var anonymityLevels = {
+	'No': 'transparent',
+	'Medium': 'anonymous',
+	'High': 'elite',
+};
+
 module.exports = {
-	homeUrl: 'http://proxydb.net/',
+	homeUrl: 'https://hidemyna.me/',
 	defaultOptions: {
 		numPagesToScrape: 10,
 	},
 	abstract: 'scraper-paginated-list',
 	config: {
-		startPageUrl: 'http://proxydb.net/',
+		startPageUrl: 'https://hidemyna.me/en/proxy-list',
 		selectors: {
-			item: 'table tbody tr',
+			item: '.proxy__t tbody tr',
 			itemAttributes: {
-				ipAddress: 'td:first-child a',
-				port: 'td:first-child a',
+				ipAddress: 'td:nth-child(1)',
+				port: 'td:nth-child(2)',
 				protocols: 'td:nth-child(5)',
 				anonymityLevel: 'td:nth-child(6)',
 			},
-			nextLink: '.pagination li:nth-child(2) a',
+			nextLink: '.proxy__pagination .is-active + li a',
 		},
 		parseAttributes: {
-			ipAddress: '(.+):[0-9]+',
 			port: function(port) {
-				var match = port.match(/.+:([0-9]+)/);
-				if (!match || !match[1]) return null;
-				port = parseInt(match[1]);
+				port = parseInt(port);
 				if (_.isNaN(port)) return null;
 				return port;
 			},
@@ -33,7 +36,7 @@ module.exports = {
 				return [protocols.trim().toLowerCase()];
 			},
 			anonymityLevel: function(anonymityLevel) {
-				return anonymityLevel.trim().toLowerCase();
+				return anonymityLevels[anonymityLevel.trim()] || null;
 			},
 		},
 	},

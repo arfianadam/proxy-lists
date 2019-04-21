@@ -1,30 +1,10 @@
 # proxy-lists
 
-Node.js module for getting proxies from publicly available proxy lists.
-
 [![Build Status](https://travis-ci.org/chill117/proxy-lists.svg?branch=master)](https://travis-ci.org/chill117/proxy-lists) [![Status of Dependencies](https://david-dm.org/chill117/proxy-lists.svg)](https://david-dm.org/chill117/proxy-lists)
 
+Node.js module for getting proxies from publicly available proxy lists. Support for more than two dozen different proxy lists. You can see the full list of proxy sources [here](https://github.com/chill117/proxy-lists/tree/master/sources).
 
-## Supported Proxy Lists
-
-* blackhatworld - Specific forum threads are scraped:
-  * [100-scrapebox-proxies](https://www.blackhatworld.com/seo/100-scrapebox-proxies.297574)
-* [freeproxylist](http://free-proxy-list.net/)
-* [freeproxylists](http://www.freeproxylists.com/)
-* [gatherproxy](http://gatherproxy.com/)
-* [hidemyass](http://proxylist.hidemyass.com/)
-* [incloak](https://incloak.com/)
-* [maxiproxies](http://maxiproxies.com/proxy-lists/)
-* proxies24 - [http](http://proxyserverlist-24.blogspot.com/), [https](http://sslproxies24.blogspot.com/), [socks](http://vip-socks24.blogspot.com/)
-* [proxydb](http://proxydb.net/)
-* [proxylisten](http://www.proxy-listen.de/)
-* [sockslist](http://sockslist.net/)
-
-Proxy lists that require an API key:
-* [bitproxies](https://bitproxies.eu/)
-* [kingproxies](http://kingproxies.com/)
-
-Missing a proxy list that you think should be here? [Open an issue](https://github.com/chill117/proxy-lists/issues) to suggest it be added as a source. Or you can [add a new source](#addsource) and [create a pull request](https://github.com/chill117/proxy-lists/pulls/new) to have it added to this module.
+Missing a proxy list that you think should be supported? [Open an issue](https://github.com/chill117/proxy-lists/issues) to suggest it be added as a source. Or you can [add a new source](#addsource) and [create a pull request](https://github.com/chill117/proxy-lists/pulls/new) to have it added to this module.
 
 
 ## Installation
@@ -83,7 +63,7 @@ proxy-lists getProxies --output-file="somefile.txt"
 
 To get proxies from specific sources:
 ```
-proxy-lists getProxies --sources-white-list="hidemyass,sockslist"
+proxy-lists getProxies --sources-white-list="gatherproxy,sockslist"
 ```
 
 To get proxies from specific countries:
@@ -170,6 +150,15 @@ All available options:
 ```js
 var options = {
 	/*
+		The filter mode determines how some options will be used to exclude proxies.
+
+		For example if using this option `anonymityLevels: ['elite']`:
+			'strict' mode will only allow proxies that have the 'anonymityLevel' property equal to 'elite'; ie. proxies that are missing the 'anonymityLevel' property will be excluded.
+			'loose' mode will allow proxies that have the 'anonymityLevel' property of 'elite' as well as those that are missing the 'anonymityLevel' property.
+	*/
+	filterMode: 'strict',
+
+	/*
 		Get proxies for the specified countries.
 
 		To get all proxies, regardless of country, set this option to NULL.
@@ -181,6 +170,14 @@ var options = {
 		['us', 'ca']
 	*/
 	countries: null,
+
+	/*
+		Exclude proxies from the specified countries.
+
+		To exclude Germany and Great Britain:
+		['de', 'gb']
+	*/
+	countriesBlackList: null,
 
 	/*
 		Get proxies that use the specified protocols.
@@ -223,7 +220,15 @@ var options = {
 		To include both ipv4 and ipv6:
 		['ipv4', 'ipv6']
 	*/
-	ipTypes: ['ipv4']
+	ipTypes: ['ipv4'],
+
+	/*
+		Default request module options. For example you could pass the 'proxy' option in this way.
+
+		See for more info:
+		https://github.com/request/request#requestdefaultsoptions
+	*/
+	defaultRequestOptions: null
 };
 ```
 
@@ -280,51 +285,8 @@ gettingProxies.once('end', function() {
 	// Done getting proxies.
 });
 ```
+See [getProxies](#getproxies) for all available options.
 
-All available options:
-```js
-var options = {
-	/*
-		Get proxies for the specified countries.
-
-		To get all proxies, regardless of country, set this option to NULL.
-
-		See:
-		https://en.wikipedia.org/wiki/ISO_3166-1
-
-		Only USA and Canada:
-		['us', 'ca']
-	*/
-	countries: null,
-
-	/*
-		Get proxies that use the specified protocols.
-
-		To get all proxies, regardless of protocol, set this option to NULL.
-	*/
-	protocols: ['http', 'https'],
-
-	/*
-		Anonymity level.
-
-		To get all proxies, regardless of anonymity level, set this option to NULL.
-	*/
-	anonymityLevels: ['anonymous', 'elite'],
-
-	/*
-		Set to TRUE to have all asynchronous operations run in series.
-	*/
-	series: false,
-
-	/*
-		Load GeoIp data for these types of IP addresses. Default is only ipv4.
-
-		To include both ipv4 and ipv6:
-		['ipv4', 'ipv6']
-	*/
-	ipTypes: ['ipv4']
-};
-```
 
 ### addSource
 
@@ -368,6 +330,12 @@ Your proxy source is required to return the following for each proxy: `ipAddress
 
 Please consider sharing your custom proxy sources by [creating a pull request](https://github.com/chill117/proxy-lists/pulls/new) to have them added to this module so that others can use them too.
 
+#### Important Options to Note
+
+Please note that there are a couple options that you should respect in your custom proxy source:
+* **sample** - `boolean` If `options.sample` is `true` then you should do your best to make the fewest number of HTTP requests to the proxy source but still get at least some real proxies. The purpose of this option is to reduce the strain caused by this module's unit tests on each proxy sources' servers.
+* **series** - `boolean` If `options.series` is `true` you should make sure that all asynchronous code in your custom source is run in series, NOT parallel. The purpose is to reduce the memory usage of the module so that it can be run in low-memory environments such as a VPS with 256MB of RAM.
+
 
 ### listSources
 
@@ -390,8 +358,8 @@ Sample `sources`:
 		homeUrl: 'http://www.freeproxylists.com'
 	},
 	{
-		name: 'hidemyass',
-		homeUrl: 'http://proxylist.hidemyass.com/'
+		name: 'gatherproxy',
+		homeUrl: 'http://www.gatherproxy.com'
 	}
 ]
 ```
@@ -430,57 +398,11 @@ There are a number of ways you can contribute:
 
 ## Tests
 
+To run the tests, you will need to install the following:
+* [mocha](https://mochajs.org/) - `npm install -g mocha`
+* [eslint](https://eslint.org/) - `npm install -g eslint`
+
 To run all tests:
 ```
-grunt test
+npm test
 ```
-
-To run only unit tests:
-```
-grunt test:unit
-```
-
-To run only code-style checks:
-```
-grunt test:code-style
-```
-
-
-## Changelog
-
-* v1.11.0:
-  * Added new source (blackhatworld).
-  * Fix for [#43](https://github.com/chill117/proxy-lists/issues/43)
-* v1.10.0:
-  * Added new source (maxiproxies).
-  * Removed source (proxyspy) because it is no longer working.
-  * Fix for [#42](https://github.com/chill117/proxy-lists/issues/42)
-  * If using your own custom sources:
-    * Proxy sources are now only required to provide `ipAddress` and `port`; all other fields are optional and should be provided only if known.
-* v1.9.0:
-  * Fixes for proxydb.
-  * Removed source (proxyocean) because it no longer exists.
-  * Added support for ipv6 addresses.
-* v1.8.0:
-  * Added `--stdout` option to CLI utility.
-  * Fixed issues: [#35](https://github.com/chill117/proxy-lists/issues/35), [#37](https://github.com/chill117/proxy-lists/issues/37)
-* v1.7.1:
-  * Fixed issues: [#28](https://github.com/chill117/proxy-lists/issues/28), [#29](https://github.com/chill117/proxy-lists/issues/29)
-* v1.7.0:
-  * Now performing geo-ip look-up for all proxies
-  * More proxy sources: gatherproxy.com, incloak.com, proxydb.net
-* v1.6.0:
-  * Added command-line interface.
-  * Fixes for source (kingproxies).
-* v1.5.1:
-  * Fixes for source (hidemyass).
-  * Removed geo-ip lookups from source (proxies24).
-* v1.5.0:
-  * Added `series` option to `ProxyLists.getProxies()` and `ProxyLists.getProxiesFromSource()`.
-* v1.4.0:
-  * `isValidProxy` no longer checks the `proxy.country` attribute.
-  * `ProxyLists.getProxies()`, `ProxyLists.getProxiesFromSource()`, and `getProxies()` for all sources now using event emitter interface.
-* v1.3.0:
-  * Removed attribute `proxy.protocol` in favor of `proxy.protocols` (an array of all supported protocols).
-  * Renamed attribute `proxy.ip_address` to `proxy.ipAddress` for consistency.
-  * Added attribute `proxy.source`.

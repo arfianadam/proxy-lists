@@ -1,9 +1,19 @@
-env:
-  - TRAVIS_CI="true"
+sudo: false
+
+addons:
+  chrome: stable
 
 language: node_js
 node_js:
-  - "4"
+  - "10"
+  - "8"
+  - "6"
 
-before_install: npm install -g grunt-cli
+before_install:
+  - npm install -g mocha
+  - npm install -g eslint
+
+env:
+  - TRAVIS_CI=1
+
 install: npm install

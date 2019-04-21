@@ -4,7 +4,6 @@ var _ = require('underscore');
 var async = require('async');
 var cheerio = require('cheerio');
 var EventEmitter = require('events').EventEmitter || require('events');
-var request = require('request');
 
 var protocolToListLabel = {
 	'http': 'free proxy server list',
@@ -25,24 +24,24 @@ module.exports = {
 		var startPages = this.prepareStartingPages(options);
 
 		var getStartingPage = async.seq(
-			this.getStartingPageHtml,
-			this.parseStartingPageHtml
+			this.getStartingPageHtml.bind(this),
+			this.parseStartingPageHtml.bind(this)
 		);
 
 		var getList = async.seq(
-			this.getListPageHtml,
-			this.parseListPageHtml
+			this.getListPageHtml.bind(this),
+			this.parseListPageHtml.bind(this)
 		);
 
 		var asyncMethod = options.series === true ? 'eachSeries' : 'each';
 
 		async[asyncMethod](startPages, function(startingPage, nextStartingPage) {
 
-			getStartingPage(startingPage, function(error, lists) {
+			getStartingPage(startingPage, options, function(error, lists) {
 
 				async[asyncMethod](lists, function(list, nextList) {
 
-					getList(list, function(error, proxies) {
+					getList(list, options, function(error, proxies) {
 
 						if (error) {
 							emitter.emit('error', error);
@@ -57,7 +56,6 @@ module.exports = {
 			});
 
 		}, function() {
-
 			emitter.emit('end');
 		});
 
@@ -68,24 +66,10 @@ module.exports = {
 
 		var startingPages = [];
 
-		if (_.contains(options.protocols, 'socks5')) {
-			startingPages.push({
-				protocols: ['socks5'],
-				url: 'http://vip-socks24.blogspot.com/'
-			});
-		}
-
-		if (_.contains(options.protocols, 'http')) {
+		if (!options.protocols || _.contains(options.protocols, 'http')) {
 			startingPages.push({
 				protocols: ['http'],
 				url: 'http://proxyserverlist-24.blogspot.com/'
-			});
-		}
-
-		if (_.contains(options.protocols, 'https')) {
-			startingPages.push({
-				protocols: ['https'],
-				url: 'http://sslproxies24.blogspot.com/'
 			});
 		}
 
@@ -104,9 +88,9 @@ module.exports = {
 		return startingPages;
 	},
 
-	getStartingPageHtml: function(startingPage, cb) {
+	getStartingPageHtml: function(startingPage, options, cb) {
 
-		request({
+		options.request({
 			method: 'GET',
 			url: startingPage.url
 		}, function(error, response, data) {
@@ -131,11 +115,12 @@ module.exports = {
 		try {
 
 			var $ = cheerio.load(html);
+			var $links = $('.post-title a');
 
-			$('.post-title a').each(function() {
+			$links.each(function() {
 
-				var $anchor = $(this);
-				var label = $anchor.text().toString().toLowerCase();
+				var $link = $(this);
+				var label = $link.text().toString().toLowerCase();
 				var protocol = _.find(protocols, function(_protocol) {
 					var searchText = protocolToListLabel[_protocol] || _protocol;
 					return label.indexOf(searchText) !== -1;
@@ -143,7 +128,7 @@ module.exports = {
 
 				if (protocol && !found[protocol]) {
 
-					var url = $anchor.attr('href').toString();
+					var url = $link.attr('href').toString();
 
 					lists.push({
 						url: url,
@@ -161,9 +146,9 @@ module.exports = {
 		cb(null, lists);
 	},
 
-	getListPageHtml: function(list, cb) {
+	getListPageHtml: function(list, options, cb) {
 
-		request({
+		options.request({
 			method: 'GET',
 			url: list.url
 		}, function(error, response, data) {
@@ -186,27 +171,14 @@ module.exports = {
 		try {
 
 			var $ = cheerio.load(html);
+			var $hosts = $('pre');
 
-			var hostsElSelectors = [
-				'.post-body textarea',
-				'.post-body pre span span:nth-child(2)',
-				'.post-body pre span span:nth-child(1)'
-			];
-
-			var $hostsEl;
-			var hostsElSelector;
-
-			while (hostsElSelectors.length > 0 && (!$hostsEl || !($hostsEl.length > 0))) {
-				hostsElSelector = hostsElSelectors.shift();
-				$hostsEl = $(hostsElSelector);
-			}
-
-			if (!$hostsEl || !($hostsEl.length > 0)) {
-				return cb(new Error('Could not find hosts HTML element.'));
+			if (!($hosts.length > 0)) {
+				throw new Error('Could not find hosts HTML element.');
 			}
 
 			// List of IP addresses (with port numbers):
-			var hosts = $hostsEl
+			var hosts = $hosts
 				// Get text inside HTML element:
 				.text().toString()
 				// Remove whitespace from beginning and end of text:
@@ -214,20 +186,17 @@ module.exports = {
 				// Split on each line-break:
 				.split('\n');
 
-			var proxies = [];
-
-			_.each(hosts, function(host) {
-
-				host = host.split(':');
-
-				if (host[0] && host[1]) {
-					proxies.push({
-						ipAddress: host[0],
-						port: parseInt(host[1]),
-						protocols: [protocol]
-					});
-				}
-			});
+			var proxies = _.chain(hosts).map(function(host) {
+				if (host.indexOf(':') === -1) return null;
+				var parts = host.split(':');
+				var port = parseInt(parts[1]);
+				if (_.isNaN(port)) return null;
+				return {
+					ipAddress: parts[0],
+					port: port,
+					protocols: [protocol],
+				};
+			}).compact().value();
 
 		} catch (error) {
 			return cb(error);
